@@ -1,0 +1,9 @@
+to build ccache for your platform:
+
+make clean
+make unpack
+make build
+
+then copy the generated ccache file from this directory to your prebuilt one
+(e.g. $TOP/prebuilt/darwin-x86/ccache)
+

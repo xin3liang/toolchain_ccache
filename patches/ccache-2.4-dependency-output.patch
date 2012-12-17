@@ -1,0 +1,79 @@
+diff -urbN ccache-2.4-org/ccache.c ccache-2.4/ccache.c
+--- ccache-2.4-org/ccache.c	2006-12-05 10:46:11.000000000 +0100
++++ ccache-2.4/ccache.c	2006-12-14 00:50:00.000000000 +0100
+@@ -65,6 +65,9 @@
+ /* can we safely use the unification hashing backend? */
+ static int enable_unify;
+ 
++/* the name of the dependency file to output when -MD is used */
++static char  *dependency_file;
++
+ /* a list of supported file extensions, and the equivalent
+    extension for code that has been through the pre-processor
+ */
+@@ -364,10 +367,17 @@
+ 
+ 	if (!direct_i_file) {
+ 		/* run cpp on the input file to obtain the .i */
++		if (dependency_file) {
++			args_add(args, "-MD" );
++			args_add(args, "-MF" );
++			args_add(args, dependency_file);
++			args_add(args, "-MQ" );
++			args_add(args, output_file);
++		}
+ 		args_add(args, "-E");
+ 		args_add(args, input_file);
+ 		status = execute(args->argv, path_stdout, path_stderr);
+-		args_pop(args, 2);
++		args_pop(args, dependency_file ? 7 : 2);
+ 	} else {
+ 		/* we are compiling a .i or .ii file - that means we
+ 		   can skip the cpp stage and directly form the
+@@ -625,10 +635,12 @@
+ 	int i;
+ 	int found_c_opt = 0;
+ 	int found_S_opt = 0;
++	int found_MD_opt = 0;
+ 	struct stat st;
+ 	char *e;
+ 
+ 	stripped_args = args_init(0, NULL);
++	dependency_file = NULL;
+ 
+ 	args_add(stripped_args, argv[0]);
+ 
+@@ -663,6 +675,11 @@
+ 			continue;
+ 		}
+ 		
++		if (strcmp(argv[i], "-MD") == 0) {
++			found_MD_opt = 1;
++			continue;
++		}
++
+ 		/* we need to work out where the output was meant to go */
+ 		if (strcmp(argv[i], "-o") == 0) {
+ 			if (i == argc-1) {
+@@ -814,6 +831,21 @@
+ 		p[2] = 0;
+ 	}
+ 
++	/* the -MD option is used to generate dependency output alongside the compilation */
++	if (found_MD_opt) {
++		char *p;
++
++		dependency_file = x_strdup(output_file);
++		p = strrchr( dependency_file, '.' );
++		if (!p || !p[1]) {
++			cc_log("badly formed dependency_file %s\n", dependency_file);
++			stats_update(STATS_ARGS);
++			failed();
++		}
++		p[1] = 'd';
++		p[2] = 0;
++	}
++
+ 	/* cope with -o /dev/null */
+ 	if (strcmp(output_file,"/dev/null") != 0 && stat(output_file, &st) == 0 && !S_ISREG(st.st_mode)) {
+ 		cc_log("Not a regular file %s\n", output_file);
